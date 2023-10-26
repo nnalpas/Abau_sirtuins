@@ -124,7 +124,7 @@ for (x in unique(my_data_wide$PTM)) {
     
     myplots[[paste0(x, "_count")]] <- ggplot(
         my_data_count %>% dplyr::filter(., PTM == x),
-        aes(x = paste(Condition, name), y = value, group = Condition, fill = Condition, label = value)) +
+        aes(x = Label, y = value, group = Condition, fill = Condition, label = value)) +
         geom_bar(stat = "identity", position = "dodge", colour = "black") +
         geom_text(stat = "identity", position = position_dodge(width = 0.9), vjust = -0.3) +
         ggpubr::theme_pubr() +
@@ -146,7 +146,7 @@ for (x in unique(my_data_wide$PTM)) {
     
     myplots[[paste0(x, "_pep_count")]] <- ggplot(
         my_data_pep_count %>% dplyr::filter(., PTM == x),
-        aes(x = paste(Condition, name), y = value, group = Condition, fill = Condition, label = value)) +
+        aes(x = Label, y = value, group = Condition, fill = Condition, label = value)) +
         geom_bar(stat = "identity", position = "dodge", colour = "black") +
         geom_text(stat = "identity", position = position_dodge(width = 0.9), vjust = -0.3) +
         ggpubr::theme_pubr() +
@@ -159,20 +159,20 @@ for (x in unique(my_data_wide$PTM)) {
 
 data.table::fwrite(
     x = my_data_wide,
-    file = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Identified_sites/Pel_BF_Overlap_detected_sites.txt",
+    file = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Identified_sites/Number_and_overlap_sites.txt",
     append = F, quote = F, sep = "\t", row.names = F, col.names = T)
 
 #pdf("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Identified_sites/Number_and_overlap_sites.pdf", 8, 8)
 #myplots
 #dev.off()
 
-cairo_pdf(filename = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Identified_sites/Pel_BF_Number_and_overlap_sites_cairo.pdf", width = 8, height = 8, onefile = T)
+cairo_pdf(filename = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Identified_sites/Number_and_overlap_sites_cairo.pdf", width = 8, height = 8, onefile = T)
 for (x in names(myplots)) {
     print(myplots[[x]])
     #grid::grid.newpage()
 }
 dev.off()
 
-save.image("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Identified_sites/Pel_BF_Number_and_overlap_sites.RData")
+save.image("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Identified_sites/Number_and_overlap_sites.RData")
 
 
