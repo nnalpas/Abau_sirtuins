@@ -35,6 +35,7 @@ my_data %<>%
         Condition %in% c("Pel_dNpdA", "dNpdA (=CobB)", "BF_dNpdA") ~ names(my_colo)[3],
         Condition %in% c("Pel_dNpdA_dKDAC", "dKDAC_NpdA (=double mutant)", "BF_dNpdA_dKDAC") ~ names(my_colo)[4]
     )) %>%
+    dplyr::select(., -Modifications, -`Modifications protein`, -Conserved, -ID, -`Accessions A1S`) %>%
     unique(.)
 
 my_data$Condition <- factor(x = my_data$Condition, levels = names(my_colo), ordered = TRUE)
@@ -114,6 +115,15 @@ my_data_pep_count$Label <- factor(
     levels = paste(rep(levels(my_data_count$Condition), each = 2), rep(c("Redundant", "Non-redundant"), times = 4)),
     ordered = T)
 
+my_data_wide_venn <- my_data %>%
+    dplyr::group_by(., `Accessions ABYAL`, Position, PTM, AA) %>%
+    dplyr::summarise(., Condition = paste0(Condition, collapse = "__")) %>%
+    dplyr::ungroup(.) %>%
+    dplyr::mutate(., value = TRUE) %>%
+    tidyr::pivot_wider(
+        data = ., names_from = Condition,
+        values_from = value, values_fill = FALSE)
+
 for (x in unique(my_data_wide$PTM)) {
     
     myplots[[paste0(x, "_venn")]] <- ggvenn::ggvenn(
@@ -154,6 +164,16 @@ for (x in unique(my_data_wide$PTM)) {
         xlab("Features") +
         ylab(paste0("Number of ", x, "ated peptides")) +
         scale_fill_manual(values = my_colo)
+    
+    data.table::fwrite(
+        x = my_data_wide %>% dplyr::filter(., PTM == x),
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Identified_sites/Condition_", x, "_for_OA.txt"),
+        append = F, quote = F, sep = "\t", row.names = F, col.names = T)
+    
+    data.table::fwrite(
+        x = my_data_wide_venn %>% dplyr::filter(., PTM == x),
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Identified_sites/Venn_", x, "_for_OA.txt"),
+        append = F, quote = F, sep = "\t", row.names = F, col.names = T)
     
 }
 
