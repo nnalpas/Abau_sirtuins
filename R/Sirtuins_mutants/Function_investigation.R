@@ -31,14 +31,13 @@ if (any(grepl("^Pel", my_data$Condition))) {
 
 my_data %<>%
     dplyr::mutate(
-        ., Replicate = sub(".+_(Rep.)", "\\1", Condition),
-        Condition = sub("_(Acet|Succi)_Rep.", "", Condition)) %>%
+        ., Condition = sub("_(Acet|Succi)_Rep.", "", Condition)) %>%
     dplyr::mutate(., Condition = dplyr::case_when(
         Condition %in% c("Pel_WT", "WT", "BF_WT") ~ names(my_colo)[1],
         Condition %in% c("Pel_dKDAC", "dKDAC (=Ab17Sir2)", "BF_dKDAC") ~ names(my_colo)[2],
         Condition %in% c("Pel_dNpdA", "dNpdA (=CobB)", "BF_dNpdA") ~ names(my_colo)[3],
-        Condition %in% c("Pel_dNpdA_dKDAC", "dKDAC_NpdA (=double mutant)", "BF_dNpdA_dKDAC") ~ names(my_colo)[4]
-    )) %>%
+        Condition %in% c("Pel_dNpdA_dKDAC", "dKDAC_NpdA (=double mutant)", "BF_dNpdA_dKDAC") ~ names(my_colo)[4])) %>%
+    dplyr::select(., -Modifications, -`Modifications protein`, -Conserved, -ID, -`Accessions A1S`) %>%
     unique(.)
 
 my_data$Condition <- factor(
@@ -114,4 +113,5 @@ for (x in names(myplots)) {
     #grid::grid.newpage()
 }
 dev.off()
+
 
