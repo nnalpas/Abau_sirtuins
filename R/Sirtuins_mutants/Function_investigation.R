@@ -8,6 +8,8 @@ library(ggplot2)
 
 myplots <- list()
 
+max_entries <- 100
+
 my_colo <- c("#5757f9ff", "#f94040ff", "#00c000ff", "#fdd61aff") %>%
     set_names(c("WT", "\u0394Sir2-Ab17", "\u0394CobB", "\u0394Sir2-Ab17\u0394CobB"))
 
@@ -73,13 +75,18 @@ my_data_annot %<>%
     tidyr::separate_rows(data = ., Category, sep = ";") %>%
     unique(.)
 
-
-    #dplyr::group_by(., PTM, DB, Category, Condition) %>%
-    #dplyr::summarise(., Count = dplyr::n_distinct(`Accessions ABYAL`)) %>%
-    #dplyr::ungroup(.)
+pdf("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Functional_annotation/Functional_overview.pdf", width = 12, height = 12)
 
 for (p in unique(my_data_annot$PTM)) {
     for (d in unique(my_data_annot$DB)) {
+        
+        my_data_annot_total <- my_data_annot %>%
+            dplyr::filter(., PTM == p & DB == d) %>%
+            plyr::ddply(
+                .data = ., .variables = "Condition",
+                .fun = dplyr::summarise,
+                Total = dplyr::n_distinct(`Accessions ABYAL`),
+                .drop = F)
         
         my_data_annot_count <- my_data_annot %>%
             dplyr::filter(., PTM == p & DB == d) %>%
@@ -89,25 +96,62 @@ for (p in unique(my_data_annot$PTM)) {
                 Count = dplyr::n_distinct(`Accessions ABYAL`),
                 .drop = F)
         
+        my_data_annot_count %<>%
+            dplyr::full_join(x = ., y = my_data_annot_total) %>%
+            dplyr::group_by(., Condition) %>%
+            dplyr::mutate(., Percentage = Count / Total * 100) %>%
+            dplyr::ungroup(.)
+        
+        facet_min_size <- floor(max_entries/length(unique(my_data_annot_count$Condition)))
+        panels_df <- split(
+            x = sort(unique(my_data_annot_count$Category)),
+            f = ceiling(seq_along(
+                sort(unique(my_data_annot_count$Category))) / facet_min_size)) %>%
+            plyr::ldply(., data.table::data.table) %>%
+            set_colnames(c("Panel", "Category"))
+        
+        my_data_annot_count %<>%
+            dplyr::left_join(x = ., y = panels_df)
+        
         my_data_annot_count$Category <- factor(
             x = my_data_annot_count$Category,
             levels = rev(sort(unique(my_data_annot_count$Category))),
             ordered = T)
         
-        myplots[[paste(p, d, "count", sep = "_")]] <- ggplot(
-            my_data_annot_count,
-            aes(x = Category, y = Count, group = Condition, fill = Condition)) +
-            geom_bar(stat = "identity", position = "dodge", colour = "black") +
-            ggpubr::theme_pubr() +
-            xlab(d) +
-            ylab(paste0("Number of K-", p, "ated proteins")) +
-            scale_fill_manual(values = my_colo) +
-            coord_flip()
+        for (i in unique(my_data_annot_count$Panel)) {
+            
+            myplots[[paste(p, d, "count", i, sep = "_")]] <- ggplot(
+                my_data_annot_count %>% dplyr::filter(., Panel == i),
+                aes(x = Category, y = Count, group = Condition, fill = Condition)) +
+                geom_bar(stat = "identity", position = "dodge", colour = "black") +
+                ggpubr::theme_pubr() +
+                xlab(d) +
+                ylab(paste0("Number of K-", p, "ated proteins")) +
+                scale_fill_manual(values = my_colo) +
+                coord_flip() +
+                ggtitle(paste("Part", i))
+            print(myplots[[paste(p, d, "count", i, sep = "_")]])
+            
+            myplots[[paste(p, d, "percent", i, sep = "_")]] <- ggplot(
+                my_data_annot_count %>% dplyr::filter(., Panel == i),
+                aes(x = Category, y = Percentage, group = Condition, fill = Condition)) +
+                geom_bar(stat = "identity", position = "dodge", colour = "black") +
+                ggpubr::theme_pubr() +
+                xlab(d) +
+                ylab(paste0("Percentage of K-", p, "ated proteins")) +
+                scale_fill_manual(values = my_colo) +
+                coord_flip() +
+                ggtitle(paste("Part", i))
+            print(myplots[[paste(p, d, "percent", i, sep = "_")]])
+            
+        }
         
     }
 }
 
-cairo_pdf(filename = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Functional_annotation/Functional_overview_cairo.pdf", width = 10, height = 20, onefile = T)
+dev.off()
+
+cairo_pdf(filename = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Functional_annotation/Functional_overview_cairo.pdf", width = 12, height = 12, onefile = T)
 for (x in names(myplots)) {
     print(myplots[[x]])
     #grid::grid.newpage()
