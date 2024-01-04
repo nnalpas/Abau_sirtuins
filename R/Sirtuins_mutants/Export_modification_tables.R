@@ -5,6 +5,7 @@ rm(list = ls())
 
 library(magrittr)
 library(ggplot2)
+library(Easy)
 
 myplots <- list()
 
@@ -48,10 +49,20 @@ my_data$Condition <- factor(
 my_fasta <- seqinr::read.fasta(
     file = my_fasta_f, seqtype = "AA",
     as.string = T, whole.header = F)
+names(my_fasta) <- sub("\\|.*", "", names(my_fasta))
 
 my_k_count <- data.table::data.table(
-    `Accessions ABYAL` = sub("\\|.*", "", names(my_fasta)),
+    `Accessions ABYAL` = names(my_fasta),
     Nmb_Lysine = stringr::str_count(string = my_fasta, pattern = "K"))
+
+my_windows <- my_data %>%
+    dplyr::select(., `Accessions ABYAL`, Position) %>%
+    unique(.) %>%
+    dplyr::rowwise(.) %>%
+    dplyr::mutate(
+        ., `Sequence window` = site_sequence_window(
+            position = Position,
+            protein = as.character(my_fasta[[`Accessions ABYAL`]])))
 
 my_annot <- data.table::fread(
     input = my_annot_f, sep = "\t", quote = "", header = T)
@@ -69,10 +80,11 @@ my_annot %<>%
 
 for (x in unique(my_data$PTM)) {
     
-    my_data_explained <- my_data %>%
+    my_sites_explained <- my_data %>%
         dplyr::filter(., PTM == x) %>%
+        dplyr::left_join(x = ., y = my_windows) %>%
         tidyr::unite(data = ., col = "Modification", Position, PTM, sep = "") %>%
-        dplyr::group_by(., `Accessions ABYAL`, Modification) %>%
+        dplyr::group_by(., `Accessions ABYAL`, Modification, `Sequence window`) %>%
         dplyr::summarise(
             ., Conditions = paste0(sort(Condition), collapse = ";")) %>%
         dplyr::mutate(., Comment = dplyr::case_when(
@@ -82,7 +94,9 @@ for (x in unique(my_data$PTM)) {
             Conditions == "WT;ΔSir2-Ab17;ΔCobB;ΔSir2-Ab17ΔCobB" ~ "Common",
             Conditions == "WT" ~ "By other enzyme or chemical",
             TRUE ~ "Unconclusive"
-        )) %>%
+        ))
+    
+    my_data_explained <- my_sites_explained %>%
         dplyr::select(., -Conditions) %>%
         dplyr::group_by(., `Accessions ABYAL`, Comment) %>%
         dplyr::summarise(
@@ -90,9 +104,40 @@ for (x in unique(my_data$PTM)) {
         tidyr::pivot_wider(
             data = ., names_from = Comment, values_from = Modification)
     
+    my_sites_explained %<>%
+        tidyr::pivot_longer(data = ., cols = c(Conditions, Comment), values_to = "Explanation") %>%
+        dplyr::mutate(., value = TRUE)
+    
+    my_prot_explained <- my_sites_explained %>%
+        dplyr::group_by(., `Accessions ABYAL`, name) %>%
+        dplyr::summarise(
+            ., Nmb_modification = dplyr::n_distinct(Modification),
+            Explanation = paste0(unique(Explanation), collapse = ";")) %>%
+        dplyr::ungroup(.) %>%
+        dplyr::mutate(
+            ., Explanation = ifelse(
+                grepl(";", Explanation), "Multiple explanation", Explanation),
+            value = TRUE) %>%
+        tidyr::unite(
+            data = ., col = "Comment", name, Explanation, sep = ": ") %>%
+        dplyr::arrange(., Comment) %>%
+        tidyr::pivot_wider(
+            data = ., names_from = "Comment", values_from = "value")
+    my_prot_explained[is.na(my_prot_explained)] <- FALSE
+    
+    my_sites_explained %<>%
+        tidyr::separate_rows(data = ., Explanation, sep = ";") %>%
+        tidyr::unite(
+            data = ., col = "Comment", name, Explanation, sep = ": ") %>%
+        dplyr::arrange(., Comment) %>%
+        tidyr::pivot_wider(
+            data = ., names_from = "Comment", values_from = "value")
+    my_sites_explained[is.na(my_sites_explained)] <- FALSE
+    
     my_data_wide <- my_data %>%
         dplyr::filter(., PTM == x) %>%
-        tidyr::unite(data = ., col = "Modification", Position, PTM, sep = "") %>%
+        tidyr::unite(
+            data = ., col = "Modification", Position, PTM, sep = "") %>%
         dplyr::group_by(., `Accessions ABYAL`, Condition) %>%
         dplyr::summarise(
             ., Modification = paste0(sort(Modification), collapse = ";")) %>%
@@ -103,9 +148,19 @@ for (x in unique(my_data$PTM)) {
     
     data.table::fwrite(
         x = my_data_wide,
-        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/", x, ".txt"),
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_explain.txt"),
         append = F, quote = F, sep = "\t", row.names = F, col.names = T)
-        
+    
+    data.table::fwrite(
+        x = my_sites_explained,
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_windows_for_OA.txt"),
+        append = F, quote = F, sep = "\t", row.names = F, col.names = T)
+    
+    data.table::fwrite(
+        x = my_prot_explained,
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_proteins_for_OA.txt"),
+        append = F, quote = F, sep = "\t", row.names = F, col.names = T)
+    
 }
 
 my_data_wide <- my_data %>%
@@ -122,7 +177,7 @@ my_data_wide <- my_data %>%
 
 data.table::fwrite(
     x = my_data_wide,
-    file = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Acetylation_Succinylation_sirtuins_mutants.txt",
+    file = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/Acetylation_Succinylation_sirtuins_mutants.txt",
     append = F, quote = F, sep = "\t", row.names = F, col.names = T)
 
 
