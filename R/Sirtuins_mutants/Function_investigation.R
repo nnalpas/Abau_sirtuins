@@ -64,11 +64,11 @@ my_data_annot <- my_annot %>%
         names_to = "DB", values_to = "Category") %>%
     dplyr::mutate(
         ., Category_no_multi = dplyr::case_when(
-            is.na(Category) | Category == "" ~ "Not found",
+            is.na(Category) | Category == "" ~ "Function unknown",
             grepl(";", Category) ~ "Multiple functions",
             TRUE ~ Category),
         Category = dplyr::case_when(
-            is.na(Category) | Category == "" ~ "Not found",
+            is.na(Category) | Category == "" ~ "Function unknown",
             TRUE ~ Category))
 
 my_data_annot %<>%
