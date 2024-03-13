@@ -11,8 +11,8 @@ myplots2 <- list()
 
 max_entries <- 100
 
-my_colo <- c("#5757f9ff", "#f94040ff", "#00c000ff", "#fdd61aff") %>%
-    set_names(c("By other enzyme or chemical", "Only by Ab17Sir2", "Only by CobB", "By Ab17Sir2 & CobB"))
+my_colo <- c("#f94040ff", "#00c000ff", "#fdd61aff") %>%
+    set_names(c("Only by Ab17Sir2", "Only by CobB", "By Ab17Sir2 & CobB"))
 
 my_annot_f <- "C:/Users/nalpanic/SynologyDrive/Work/Abaumannii_trimeth/Annotation/2023-05-16/Acinetobacter_baumannii_ATCC_17978_full_annotation_2023-05-16.txt"
 
@@ -53,29 +53,25 @@ my_data %<>%
 my_data %<>%
     dplyr::group_by(., `Accessions ABYAL`, Position, PTM, AA) %>%
     dplyr::summarise(
-        ., Conditions = paste0(sort(Condition), collapse = ";")) %>%
+        ., Conditions = paste0(sort(unique(Condition)), collapse = ";")) %>%
+    #dplyr::mutate(., Comment = dplyr::case_when(
+    #    Conditions == "ΔSir2-Ab17;ΔSir2-Ab17ΔCobB" ~ "Only by Ab17Sir2",
+    #    Conditions == "ΔCobB;ΔSir2-Ab17;ΔSir2-Ab17ΔCobB" ~ "By Ab17Sir2 & CobB",
+    #    Conditions == "ΔCobB;ΔSir2-Ab17ΔCobB" ~ "Only by CobB",
+    #    Conditions == "WT;ΔCobB;ΔSir2-Ab17;ΔSir2-Ab17ΔCobB" ~ "Common",
+    #    Conditions == "WT" ~ "By other enzyme or chemical",
+    #    TRUE ~ "Unconclusive"
+    #))
     dplyr::mutate(., Comment = dplyr::case_when(
-        Conditions == "ΔSir2-Ab17;ΔSir2-Ab17ΔCobB" ~ "Only by Ab17Sir2",
-        Conditions == "ΔCobB;ΔSir2-Ab17;ΔSir2-Ab17ΔCobB" ~ "By Ab17Sir2 & CobB",
-        Conditions == "ΔCobB;ΔSir2-Ab17ΔCobB" ~ "Only by CobB",
-        Conditions == "WT;ΔCobB;ΔSir2-Ab17;ΔSir2-Ab17ΔCobB" ~ "Common",
-        Conditions == "WT" ~ "By other enzyme or chemical",
-        TRUE ~ "Unconclusive"
-    ),
-    Comment2 = dplyr::case_when(
         Conditions %in% c("ΔSir2-Ab17", "ΔSir2-Ab17;ΔSir2-Ab17ΔCobB") ~ "Only by Ab17Sir2",
-        Conditions %in% c("ΔSir2-Ab17ΔCobB", "ΔCobB;ΔSir2-Ab17;ΔSir2-Ab17ΔCobB") ~ "By Ab17Sir2 & CobB",
+        Conditions %in% c("ΔSir2-Ab17ΔCobB", "ΔCobB;ΔSir2-Ab17;ΔSir2-Ab17ΔCobB", "ΔSir2-Ab17;ΔCobB;ΔSir2-Ab17ΔCobB") ~ "By Ab17Sir2 & CobB",
         Conditions %in% c("ΔCobB", "ΔCobB;ΔSir2-Ab17ΔCobB") ~ "Only by CobB",
-        Conditions == "WT;ΔCobB;ΔSir2-Ab17;ΔSir2-Ab17ΔCobB" ~ "Common",
-        Conditions == "WT" ~ "By other enzyme or chemical",
+        Conditions %in% c("WT;ΔCobB;ΔSir2-Ab17;ΔSir2-Ab17ΔCobB", "WT;ΔSir2-Ab17;ΔCobB;ΔSir2-Ab17ΔCobB") ~ "Common",
         TRUE ~ "Unconclusive"
     ))
 
 my_data$Comment <- factor(
     x = my_data$Comment, levels = names(my_colo), ordered = TRUE)
-
-my_data$Comment2 <- factor(
-    x = my_data$Comment2, levels = names(my_colo), ordered = TRUE)
 
 my_annot <- data.table::fread(
     input = my_annot_f, sep = "\t", quote = "", header = T)
@@ -86,7 +82,7 @@ my_data_annot <- my_annot %>%
         `GOCC Term`, `GOMF Term`, COG_function,
         `Subcellular Localization [b2g]`) %>%
     dplyr::left_join(
-        x = unique(my_data[, c("Accessions ABYAL", "Comment", "Comment2", "PTM")]),
+        x = unique(my_data[, c("Accessions ABYAL", "Comment", "PTM")]),
         y = ., by = c("Accessions ABYAL" = "Locus Tag")) %>%
     tidyr::pivot_longer(
         data = ., cols = c(
@@ -190,85 +186,4 @@ for (x in grep('COG', names(myplots), value = T)) {
 }
 dev.off()
 
-pdf("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Functional_annotation/Functional_overview_comment2.pdf", width = 12, height = 12)
 
-for (p in unique(my_data_annot$PTM)) {
-    for (d in unique(my_data_annot$DB)) {
-        
-        my_data_annot_total <- my_data_annot %>%
-            dplyr::filter(., PTM == p & DB == d & Comment2 %in% names(my_colo)) %>%
-            plyr::ddply(
-                .data = ., .variables = "Comment2",
-                .fun = dplyr::summarise,
-                Total = dplyr::n_distinct(`Accessions ABYAL`),
-                .drop = F)
-        
-        my_data_annot_count <- my_data_annot %>%
-            dplyr::filter(., PTM == p & DB == d & Comment2 %in% names(my_colo)) %>%
-            plyr::ddply(
-                .data = ., .variables = c("Category", "Comment2"),
-                .fun = dplyr::summarise,
-                Count = dplyr::n_distinct(`Accessions ABYAL`),
-                .drop = F)
-        
-        my_data_annot_count %<>%
-            dplyr::full_join(x = ., y = my_data_annot_total) %>%
-            dplyr::group_by(., Comment2) %>%
-            dplyr::mutate(., Percentage = Count / Total * 100) %>%
-            dplyr::ungroup(.)
-        
-        facet_min_size <- floor(max_entries/length(unique(my_data_annot_count$Comment2)))
-        panels_df <- split(
-            x = sort(unique(my_data_annot_count$Category)),
-            f = ceiling(seq_along(
-                sort(unique(my_data_annot_count$Category))) / facet_min_size)) %>%
-            plyr::ldply(., data.table::data.table) %>%
-            set_colnames(c("Panel", "Category"))
-        
-        my_data_annot_count %<>%
-            dplyr::left_join(x = ., y = panels_df)
-        
-        my_data_annot_count$Category <- factor(
-            x = my_data_annot_count$Category,
-            levels = rev(sort(unique(my_data_annot_count$Category))),
-            ordered = T)
-        
-        for (i in unique(my_data_annot_count$Panel)) {
-            
-            myplots2[[paste(p, d, "count", i, sep = "_")]] <- ggplot(
-                my_data_annot_count %>% dplyr::filter(., Panel == i),
-                aes(x = Category, y = Count, group = Comment2, fill = Comment2)) +
-                geom_bar(stat = "identity", position = "dodge", colour = "black") +
-                ggpubr::theme_pubr() +
-                xlab(d) +
-                ylab(paste0("Number of K-", p, "ated proteins")) +
-                scale_fill_manual(values = my_colo) +
-                coord_flip() +
-                ggtitle(paste("Part", i))
-            print(myplots2[[paste(p, d, "count", i, sep = "_")]])
-            
-            myplots2[[paste(p, d, "percent", i, sep = "_")]] <- ggplot(
-                my_data_annot_count %>% dplyr::filter(., Panel == i),
-                aes(x = Category, y = Percentage, group = Comment2, fill = Comment2)) +
-                geom_bar(stat = "identity", position = "dodge", colour = "black") +
-                ggpubr::theme_pubr() +
-                xlab(d) +
-                ylab(paste0("Percentage of K-", p, "ated proteins")) +
-                scale_fill_manual(values = my_colo) +
-                coord_flip() +
-                ggtitle(paste("Part", i))
-            print(myplots2[[paste(p, d, "percent", i, sep = "_")]])
-            
-        }
-        
-    }
-}
-
-dev.off()
-
-cairo_pdf(filename = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Functional_annotation/Functional_overview_COG_comment2.pdf", width = 12, height = 12, onefile = T)
-for (x in grep('COG', names(myplots2), value = T)) {
-    print(myplots2[[x]])
-    #grid::grid.newpage()
-}
-dev.off()
