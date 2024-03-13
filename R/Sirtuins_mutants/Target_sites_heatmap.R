@@ -65,7 +65,7 @@ my_annot <- data.table::fread(
     input = my_annot_f, sep = "\t", quote = "", header = T)
 
 my_annot_targets <- my_annot
-for (w in c("biofilm", "motility", "adhesion", "resistance")) {
+for (w in c("biofilm", "motility", "adhesion", "virulence")) {
     my_annot_targets[[paste0("In_", w)]] <- apply(my_annot, MARGIN = 1, function(x) {
         any(grepl(w, x, ignore.case = T))
     })
@@ -119,7 +119,7 @@ interesting_sites_long <- interesting_sites %>%
     dplyr::mutate(
         ., Type = dplyr::case_when(
             !grepl("^In_", Type) ~ Type,
-            Type %in% c("In_biofilm", "In_motility", "In_adhesion", "In_resistance") ~ "Function",
+            Type %in% c("In_biofilm", "In_motility", "In_adhesion", "In_virulence") ~ "Function",
             TRUE ~ "Characteristic")) %>%
     dplyr::mutate(
         ., Type = ifelse(value == TRUE, Type, NA)) %>%
@@ -135,7 +135,7 @@ interesting_sites_long$name <- factor(
     x = interesting_sites_long$name,
     levels = c(
         "A_WT", "A_ΔSir2-Ab17", "A_ΔCobB", "A_ΔSir2-Ab17ΔCobB", "S_WT", "S_ΔSir2-Ab17", "S_ΔCobB", "S_ΔSir2-Ab17ΔCobB",
-        "In_Operon", "In_Essential", "In_actsite", "In_biofilm", "In_motility", "In_adhesion", "In_resistance"),
+        "In_Operon", "In_Essential", "In_actsite", "In_biofilm", "In_motility", "In_adhesion", "In_virulence"),
     ordered = TRUE)
 
 interesting_sites_long$Type <- factor(
@@ -145,14 +145,14 @@ interesting_sites_long$Type <- factor(
     ordered = TRUE)
 
 my_targets <- my_annot_targets %>%
-    dplyr::filter(., In_biofilm == TRUE | In_motility == TRUE | In_adhesion == TRUE | In_resistance == TRUE) %>%
+    dplyr::filter(., In_biofilm == TRUE | In_motility == TRUE | In_adhesion == TRUE | In_virulence == TRUE) %>%
     .[["Locus Tag"]] %>%
     unique(.)
 
 toplot <- interesting_sites_long %>%
     dplyr::filter(., `Accessions ABYAL` %in% my_targets)
 
-toplot_panel <- split(x = unique(toplot$Name), ceiling(seq_along(unique(toplot$Name))/14)) %>%
+toplot_panel <- split(x = unique(toplot$Name), ceiling(seq_along(unique(toplot$Name))/16)) %>%
     plyr::ldply(., data.table::data.table, .id = "Panel") %>%
     set_colnames(c("Panel", "Name"))
 
@@ -196,7 +196,7 @@ my_plot[["heatmap_actsite"]] <- ggplot(
     scale_fill_manual(values = my_colo, na.value = "#F2F2F2") +
     facet_wrap(facets = vars(Panel), ncol = 4, scales = "free_y")
 
-pdf("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sites_of_interest/Site_heatmap.pdf", width = 10, height = 9)
+pdf("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sites_of_interest/Site_heatmap_2024-03-12.pdf", width = 10, height = 9)
 my_plot
 dev.off()
 
