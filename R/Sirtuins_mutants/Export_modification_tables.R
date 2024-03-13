@@ -16,7 +16,13 @@ my_data_f <- c("C:/Users/nalpanic/SynologyDrive/Work/Abaumannii_trimeth/dbPTM/Ro
 
 my_fasta_f <- c("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/ATCC_17978_plasmides.fasta")
 
-my_annot_f <- "C:/Users/nalpanic/SynologyDrive/Work/Abaumannii_trimeth/Annotation/2023-05-16/Acinetobacter_baumannii_ATCC_17978_full_annotation_2023-05-16.txt"
+my_annot_f <- "C:/Users/nalpanic/SynologyDrive/Work/Abaumannii_trimeth/Annotation/2023-05-16/Acinetobacter_baumannii_ATCC_17978_full_annotation_2024-03-12_manual_review_withOperon_withSir-targets.txt"
+
+my_sig <- "D:/PXD004167/combined/txt/Statistics_2023-07-05/Statistics_report.RData"
+
+my_actsites_f <- "C:/Users/nalpanic/SynologyDrive/Work/Abaumannii_trimeth/InterPro/PTM_on_activesite_2024-01-10.txt"
+
+my_domain_f <- "C:/Users/nalpanic/SynologyDrive/Work/Abaumannii_trimeth/InterPro/PTM_on_domain_2024-01-10.txt"
 
 my_data <- lapply(my_data_f, function(x) {
     data.table::fread(
@@ -31,8 +37,9 @@ if (any(grepl("^Pel", my_data$Condition))) {
 }
 
 my_data %<>%
+    dplyr::rename(., Sample = Condition) %>%
     dplyr::mutate(
-        ., Condition = sub("_(Acet|Succi)_Rep.", "", Condition)) %>%
+        ., Condition = sub("_(Acet|Succi)_Rep.", "", Sample)) %>%
     dplyr::mutate(., Condition = dplyr::case_when(
         Condition %in% c("Pel_WT", "WT", "BF_WT") ~ names(my_colo)[1],
         Condition %in% c("Pel_dKDAC", "dKDAC (=Ab17Sir2)", "BF_dKDAC") ~ names(my_colo)[2],
@@ -40,7 +47,9 @@ my_data %<>%
         Condition %in% c("Pel_dNpdA_dKDAC", "dKDAC_NpdA (=double mutant)", "BF_dNpdA_dKDAC") ~ names(my_colo)[4])) %>%
     dplyr::select(., -Modifications, -`Modifications protein`, -Conserved, -ID, -`Accessions A1S`) %>%
     unique(.) %>%
-    dplyr::mutate(., PTM = sub("^(.).+", "\\1", PTM))
+    dplyr::mutate(
+        ., PTM = sub("^(.).+", "\\1", PTM),
+        Replicate = sub("Pel_", "", Sample) %>% sub("(Acet|Succi)_", "", .))
 
 my_data$Condition <- factor(
     x = my_data$Condition, levels = names(my_colo), ordered = TRUE)
@@ -64,8 +73,9 @@ my_windows <- my_data %>%
             position = Position,
             protein = as.character(my_fasta[[`Accessions ABYAL`]])))
 
+
 my_annot <- data.table::fread(
-    input = my_annot_f, sep = "\t", quote = "", header = T)
+    input = my_annot_f, sep = "\t", header = T)
 
 my_annot %<>%
     dplyr::select(
@@ -73,10 +83,56 @@ my_annot %<>%
         `Gene Name`, `Product Name`,
         `KEGG Pathway Name`, `GOBP Term`,
         `GOCC Term`, `GOMF Term`, COG_function,
-        `Subcellular Localization [b2g]`) %>%
+        `Subcellular Localization [b2g]`, COG_function_review,
+        OperonID, essentiality, `Known sirtuin target`,
+        `Gene Names [ukb]`, `RefSeq ID`) %>%
     dplyr::left_join(
         x = my_k_count,
         y = ., by = c("Accessions ABYAL" = "Locus Tag"))
+
+
+my_session <- new.env()
+load(my_sig, envir = my_session)
+my_stats <- my_session$my_stats_final %>%
+    dplyr::filter(
+        ., `ANOVA BH corrected p-value` <= 0.05 &
+            !is.na(`Tukey adj.p.value`) & `Tukey adj.p.value` <= 0.05) %>%
+    dplyr::select(
+        ., `Protein IDs`, `ANOVA BH corrected p-value`,
+        contrast, `fold change`) %>%
+    tidyr::pivot_wider(
+        data = ., names_from = "contrast", values_from = "fold change") %>%
+    tidyr::separate_rows(data = ., `Protein IDs`, sep = ";")
+
+my_annot %<>%
+    dplyr::left_join(
+        x = .,
+        y = my_stats, by = c("RefSeq ID" = "Protein IDs"))
+
+
+my_domain <- data.table::fread(
+    input = my_domain_f, sep = "\t", quote = "", header = T) %>%
+    dplyr::filter(., grepl("Robin", Study))
+
+my_domain_sum <- my_domain %>%
+    dplyr::filter(
+        ., !is.na(`signature.description`) & `signature.description` != "") %>%
+    dplyr::group_by(., `Accessions ABYAL`, Position) %>%
+    dplyr::summarise(
+        ., `Functional domain` = paste0(
+            unique(`signature.description`), collapse = ";")) %>%
+    dplyr::ungroup(.)
+
+
+my_actsite <- data.table::fread(
+    input = my_actsites_f, sep = "\t", quote = "", header = T) %>%
+    dplyr::filter(., grepl("Robin", Study))
+
+my_actsite_sum <- my_actsite %>%
+    dplyr::group_by(., `Accessions ABYAL`, Position) %>%
+    dplyr::summarise(., `Active sites` = paste0(unique(`locs.description`), collapse = ";")) %>%
+    dplyr::ungroup(.)
+
 
 for (x in unique(my_data$PTM)) {
     
@@ -86,21 +142,28 @@ for (x in unique(my_data$PTM)) {
         tidyr::unite(data = ., col = "Modification", Position, PTM, sep = "") %>%
         dplyr::group_by(., `Accessions ABYAL`, Modification, `Sequence window`) %>%
         dplyr::summarise(
-            ., Conditions = paste0(sort(Condition), collapse = ";")) %>%
+            ., Conditions = paste0(sort(unique(Condition)), collapse = ";"),
+            Replicates = paste0(sort(unique(Replicate)), collapse = ";")) %>%
+        #dplyr::mutate(., Comment = dplyr::case_when(
+        #    Conditions == "ΔSir2-Ab17;ΔSir2-Ab17ΔCobB" ~ "Only by Ab17Sir2",
+        #    Conditions == "ΔSir2-Ab17;ΔCobB;ΔSir2-Ab17ΔCobB" ~ "By Ab17Sir2 & CobB",
+        #    Conditions == "ΔCobB;ΔSir2-Ab17ΔCobB" ~ "Only by CobB",
+        #    Conditions == "WT;ΔSir2-Ab17;ΔCobB;ΔSir2-Ab17ΔCobB" ~ "Common",
+        #    Conditions == "WT" ~ "By other enzyme or chemical",
+        #    TRUE ~ "Unconclusive"
+        #))
         dplyr::mutate(., Comment = dplyr::case_when(
-            Conditions == "ΔSir2-Ab17;ΔSir2-Ab17ΔCobB" ~ "Only by Ab17Sir2",
-            Conditions == "ΔSir2-Ab17;ΔCobB;ΔSir2-Ab17ΔCobB" ~ "By Ab17Sir2 & CobB",
-            Conditions == "ΔCobB;ΔSir2-Ab17ΔCobB" ~ "Only by CobB",
-            Conditions == "WT;ΔSir2-Ab17;ΔCobB;ΔSir2-Ab17ΔCobB" ~ "Common",
-            Conditions == "WT" ~ "By other enzyme or chemical",
+            Conditions %in% c("ΔSir2-Ab17", "ΔSir2-Ab17;ΔSir2-Ab17ΔCobB") ~ "Only by Ab17Sir2",
+            Conditions %in% c("ΔSir2-Ab17ΔCobB", "ΔCobB;ΔSir2-Ab17;ΔSir2-Ab17ΔCobB", "ΔSir2-Ab17;ΔCobB;ΔSir2-Ab17ΔCobB") ~ "By Ab17Sir2 & CobB",
+            Conditions %in% c("ΔCobB", "ΔCobB;ΔSir2-Ab17ΔCobB") ~ "Only by CobB",
+            Conditions %in% c("WT;ΔCobB;ΔSir2-Ab17;ΔSir2-Ab17ΔCobB", "WT;ΔSir2-Ab17;ΔCobB;ΔSir2-Ab17ΔCobB") ~ "Common",
             TRUE ~ "Unconclusive"
         ))
     
     my_data_explained <- my_sites_explained %>%
-        dplyr::select(., -Conditions) %>%
         dplyr::group_by(., `Accessions ABYAL`, Comment) %>%
         dplyr::summarise(
-            ., Modification = paste0(sort(Modification), collapse = ";")) %>%
+            ., Modification = paste0(sort(unique(Modification)), collapse = ";")) %>%
         tidyr::pivot_wider(
             data = ., names_from = Comment, values_from = Modification)
     
@@ -134,6 +197,14 @@ for (x in unique(my_data$PTM)) {
             data = ., names_from = "Comment", values_from = "value")
     my_sites_explained[is.na(my_sites_explained)] <- FALSE
     
+    my_sites_explained_final <- my_sites_explained %>%
+        dplyr::mutate(., Position = as.integer(sub("[A-Z]+", "", Modification))) %>%
+        dplyr::left_join(x = ., y = my_domain_sum) %>%
+        dplyr::left_join(x = ., y = my_actsite_sum) %>%
+        dplyr::left_join(x = ., y = my_annot[, c(
+            "Accessions ABYAL", "Gene Name", "Gene Names [ukb]",
+            "GenBank_accession", "GenBank_gene_accession", "RefSeq ID")])
+    
     my_data_wide <- my_data %>%
         dplyr::filter(., PTM == x) %>%
         tidyr::unite(
@@ -148,17 +219,22 @@ for (x in unique(my_data$PTM)) {
     
     data.table::fwrite(
         x = my_data_wide,
-        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_explain.txt"),
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_explain_2024-03-13.txt"),
+        append = F, quote = F, sep = "\t", row.names = F, col.names = T)
+    
+    data.table::fwrite(
+        x = my_sites_explained_final,
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_sites_explain_2024-03-13.txt"),
         append = F, quote = F, sep = "\t", row.names = F, col.names = T)
     
     data.table::fwrite(
         x = my_sites_explained,
-        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_windows_for_OA.txt"),
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_windows_for_OA_2024-03-13.txt"),
         append = F, quote = F, sep = "\t", row.names = F, col.names = T)
     
     data.table::fwrite(
         x = my_prot_explained,
-        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_proteins_for_OA.txt"),
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_proteins_for_OA_2024-03-13.txt"),
         append = F, quote = F, sep = "\t", row.names = F, col.names = T)
     
 }
@@ -166,7 +242,7 @@ for (x in unique(my_data$PTM)) {
 my_data_wide <- my_data %>%
     dplyr::group_by(., `Accessions ABYAL`, Position, Condition) %>%
     dplyr::summarise(
-        ., PTM = paste0(sort(PTM), collapse = "+")) %>%
+        ., PTM = paste0(sort(unique(PTM)), collapse = "+")) %>%
     tidyr::unite(data = ., col = "Modification", Position, PTM, sep = "") %>%
     dplyr::group_by(., `Accessions ABYAL`, Condition) %>%
     dplyr::summarise(
@@ -177,7 +253,7 @@ my_data_wide <- my_data %>%
 
 data.table::fwrite(
     x = my_data_wide,
-    file = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/Acetylation_Succinylation_sirtuins_mutants.txt",
+    file = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/Acetylation_Succinylation_sirtuins_mutants_2024-03-13.txt",
     append = F, quote = F, sep = "\t", row.names = F, col.names = T)
 
 
