@@ -3,7 +3,7 @@
 
 library(magrittr)
 
-my_path <- 'C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf'
+my_path <- 'C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf_optimised'
 
 my_f <- list.files(path = my_path, pattern = "msa_fasta.aln", full.names = T, recursive = T) %>%
     set_names(sub("_Consurf_Outputs_.+", "", basename(dirname(.))))
