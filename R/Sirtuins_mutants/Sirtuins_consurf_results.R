@@ -12,10 +12,12 @@ my_big_cols <- RColorBrewer::brewer.pal(n = 4, name = "Dark2") %>%
 
 my_plots <- list()
 
-my_tree_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf/All_consurf_sequences_msa.tree"
-my_tree_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf/PhyloSuite/FastTree_results/2024_05_28-12_08_20/all_gene_trees.nwk"
+#my_tree_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf/All_consurf_sequences_msa.tree"
+#my_tree_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf/PhyloSuite/FastTree_results/2024_05_28-12_08_20/all_gene_trees.nwk"
+my_tree_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf_optimised/PhyloSuite/FastTree_results/all_gene_trees.nwk"
 
-my_gene_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf/All_consurf_sequences_header.txt"
+#my_gene_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf_optimised/All_consurf_sequences_header.txt"
+my_gene_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf_optimised/All_consurf_optimised_sequences_header.txt"
 
 
 
@@ -44,9 +46,7 @@ my_gene <- data.table::fread(
 #    x = my_gene, file = sub("\\.txt", "_formatted.txt", my_gene_f),
 #    append = F, quote = F, sep = "\t", row.names = F, col.names = T)
 
-my_name <- paste(
-    dirname(my_gene_f),
-    "All_consurf_sequences_header_genename.txt", sep = "/") %>%
+my_name <- sub("\\.txt", "_genename.txt", my_gene_f) %>%
     data.table::fread(
         input = ., sep = "\t", header = T,
         col.names = c("UniProtID", "GeneName"))
@@ -89,22 +89,6 @@ legend <- colors %>%
 legend %<>%
     unique(.)
 
-plot(x = my_tree, main = "UPGMA", tip.color = tipcol, show.tip.label = F)
-tiplabels(pch = 16, col = tipcol, cex = 0.7)
-legend("bottomright", legend = legend[["Type"]],
-       title = "Legend",
-       col = legend[["Colour"]], pch = 16, cex = 0.8)
-
-plot(x = my_tree, "unrooted", main = "NJ", tip.color = tipcol, show.tip.label = F)
-tiplabels(pch = 16, col = tipcol, cex = 0.4)
-legend("bottomright", legend = legend[["Type"]],
-       title = "Legend",
-       col = legend[["Colour"]], pch = 16, cex = 0.8)
-
-
-
-
-
 my_taxid <- my_gene$Organism %>%
     unique(.) %>%
     taxize::get_ids(sci_com = ., db = "ncbi")
@@ -112,7 +96,8 @@ my_taxid <- my_gene$Organism %>%
 my_taxid_format <- data.table::data.table(
     ID = as.integer(my_taxid[[1]]), Organism = names(my_taxid[[1]]))
 
-my_lineage <- unique(my_taxid_format$ID) %>%
+
+my_lineage <- unique(my_taxid_format$ID)[c(1:500)] %>%
     taxize::classification(sci_id = ., db = "ncbi")
 
 my_lineage_format <- my_lineage %>%
@@ -133,28 +118,124 @@ my_lineage_stats <- my_gene_lineage %>%
     dplyr::group_by(., Type, name) %>%
     dplyr::summarise(., Count = dplyr::n()) %>%
     dplyr::group_by(., Type) %>%
+    dplyr::arrange(., dplyr::desc(Count)) %>%
+    dplyr::mutate(
+        ., Rank = 1:dplyr::n(),
+        Label = dplyr::case_when(
+            Rank < 5 ~ name,
+            TRUE ~ "Others"
+        )) %>%
+    dplyr::group_by(., Type, Label) %>%
+    dplyr::summarise(
+        ., name = paste0(name, collapse = "; "),
+        Count = sum(Count)) %>%
+    dplyr::group_by(., Type) %>%
     dplyr::summarise(
         ., name = name, Count = Count, Percent = Count/sum(Count)*100) %>%
-    dplyr::ungroup(.) %>%
-    dplyr::arrange(., Type, dplyr::desc(Percent))
-
-my_lineage_stats_format <- my_lineage_stats %>%
-    dplyr::
+    dplyr::ungroup(.)
 
 
-for ()
 
-ggplot(
-    my_lineage_stats %>% dplyr::filter(., Type == "Sir2" & Count > 1),
-    aes(x = "", y = Percent, fill = name)) +
-    geom_bar(stat = "identity", width = 1) +
-    coord_polar("y", start = 0) +
-    geom_text(
-        aes(label = paste0(format(Percent, digits = 2), "%")),
-        position = position_stack(vjust = 0.5)) +
-    labs(x = NULL, y = NULL, fill = NULL) +
-    theme_classic() +
-    theme(
-        axis.line = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank())
+
+pdf(sub("\\.(nwk|tree)", "_tree.pdf", my_tree_f), 10, 10)
+
+plot(x = my_tree, main = "UPGMA", tip.color = tipcol, show.tip.label = F)
+tiplabels(pch = 16, col = tipcol, cex = 0.7)
+legend("bottomright", legend = legend[["Type"]],
+       title = "Legend",
+       col = legend[["Colour"]], pch = 16, cex = 0.8)
+add.scale.bar(cex = 1, font = 2, col = "black")
+
+plot(x = my_tree, "unrooted", main = "NJ", tip.color = tipcol, show.tip.label = F)
+tiplabels(pch = 16, col = tipcol, cex = 0.7)
+legend("bottomright", legend = legend[["Type"]],
+       title = "Legend",
+       col = legend[["Colour"]], pch = 16, cex = 0.8)
+add.scale.bar(cex = 1, font = 2, col = "black")
+
+my_distances <- ape::dist.nodes(x = my_tree)
+
+dev.off()
+
+
+pdf(sub("\\.(nwk|tree)", "_taxon.pdf", my_tree_f), 10, 10)
+
+color_shades <- list(
+    CobB = c("#052018", "#105f47", "#1b9e77", "#76c5ad", "#d1ece4"),
+    CobB_long = c("#2e081c", "#8b1953", "#e7298a", "#f17fb9", "#fad4e8"),
+    SrtN = c("#171624", "#46436b", "#7570b3", "#aca9d1", "#e3e2f0"),
+    Sir2 = c("#2b1300", "#823901", "#d95f02", "#e89f67", "#f7dfcc"))
+
+my_lineage_stats$Type <- sub("_optimised", "", my_lineage_stats$Type)
+
+for (x in unique(my_lineage_stats$Type)) {
+    
+    toplot <- my_lineage_stats %>%
+        dplyr::filter(., Type == x) %>%
+        dplyr::arrange(., dplyr::desc(Count))
+    
+    toplot$name <- factor(x = toplot$name, levels = toplot$name, ordered = T)
+    
+    pl <- ggplot(
+        toplot,
+        aes(x = "", y = Percent, fill = name)) +
+        geom_bar(stat = "identity", width = 1) +
+        coord_polar("y", start = 0) +
+        geom_text(
+            aes(label = paste0(format(Percent, digits = 2), "%")),
+            position = position_stack(vjust = 0.5)) +
+        labs(x = NULL, y = NULL, fill = NULL) +
+        theme_classic() +
+        theme(
+            axis.line = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank()) +
+        scale_fill_manual(values = color_shades[[x]])
+    
+    print(pl)
+    
+}
+
+dev.off()
+
+
+
+my_gene_lineage_complete <- my_taxid_format %>%
+    dplyr::left_join(x = ., y = my_lineage_format, by = c()) %>%
+    #dplyr::filter(., rank == "species") %>%
+    dplyr::select(., Organism, name, id, rank) %>%
+    unique(.) %>%
+    dplyr::left_join(x = my_gene, y = .)
+
+priority_species <- c(
+    "Acinetobacter baumannii", "Enterobacterales", "Salmonella Typhi",
+    "Shigella spp.", "Mycobacterium tuberculosis", "Enterococcus faecium",
+    "Pseudomonas aeruginosa", "Salmonella", "Neisseria gonorrhoeae",
+    "Staphylococcus aureus", "Streptococci", "Streptococcus pneumoniae",
+    "Haemophilus influenzae")
+priority_genus <- c(
+    "Acinetobacter", "Enterobacterales", "Salmonella",
+    "Shigella", "Mycobacterium", "Enterococcus",
+    "Pseudomonas", "Salmonella", "Neisseria",
+    "Staphylococcus", "Streptococci", "Streptococcus",
+    "Haemophilus")
+
+my_gene_lineage_complete_filt <- my_gene_lineage_complete %>%
+    dplyr::filter(., grepl(
+        paste("^(", paste0(priority_genus, collapse = "|"), ")", sep = ""), name, ignore.case = T))
+
+View(unique(my_gene_lineage_complete_filt[, c("Type", "name")]))
+
+data.table::fwrite(
+    x = my_gene_lineage_complete_filt,
+    file = sub("\\.(nwk|tree)", "_pathogens.txt", my_tree_f),
+    append = F, quote = F, sep = "\t", row.names = F, col.names = T)
+
+my_kingdom <- my_gene_lineage_complete %>%
+    dplyr::filter(., rank == "superkingdom") %>%
+    dplyr::select(., Type, name) %>%
+    unique(.)
+
+save.image(file = sub("\\.(nwk|tree)", "_session.RData", my_tree_f))
+
+
