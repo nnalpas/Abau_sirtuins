@@ -20,8 +20,10 @@ my_fasta_format <- my_fasta %>%
 
 my_fasta_format <- my_fasta_format[!duplicated(names(my_fasta_format))]
 
-seqinr::write.fasta(sequences = as.list(my_fasta_format), names = names(my_fasta_format), file.out = paste(my_path, "All_consurf_sequences.fasta", sep = "/"), open = "w")
+seqinr::write.fasta(sequences = as.list(my_fasta_format), names = names(my_fasta_format), file.out = paste(my_path, "All_consurf_sequences_2024-06-12.fasta", sep = "/"), open = "w")
 
-writeLines(text = names(my_fasta), con = paste(my_path, "All_consurf_sequences_header.txt", sep = "/"))
+writeLines(text = names(my_fasta), con = paste(my_path, "All_consurf_sequences_header_2024-06-12.txt", sep = "/"))
+
+writeLines(text = names(my_fasta_format), con = paste(my_path, "All_consurf_sequences_id_2024-06-12.txt", sep = "/"))
 
 
