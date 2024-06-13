@@ -9,10 +9,11 @@ library(ggplot2)
 length_prot <- 473
 length_prot <- 232
 
-my_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation_pubMLST/cobB_presence_table.txt"
+my_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/pubMLST_Blast/cobB_presence_table.txt"
 
 my_data <- data.table::fread(
-    input = my_f, sep = "\t", quote = "", header = T, fill = T)
+    input = my_f, sep = "\t", quote = "", header = T, fill = T) %>%
+    dplyr::filter(., species == "Acinetobacter baumannii")
 
 pdf(sub(".txt", ".pdf", my_f), 10, 10)
 
