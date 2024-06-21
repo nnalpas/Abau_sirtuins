@@ -7,17 +7,19 @@ library(magrittr)
 library(ggplot2)
 library(phangorn)
 
-my_big_cols <- RColorBrewer::brewer.pal(n = 4, name = "Dark2") %>%
+my_big_cols <- RColorBrewer::brewer.pal(n = 12, name = "Paired") %>%
     sample(x = ., size = length(.), replace = F)
 
 my_plots <- list()
 
 #my_tree_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf/All_consurf_sequences_msa.tree"
 #my_tree_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf/PhyloSuite/FastTree_results/2024_05_28-12_08_20/all_gene_trees.nwk"
-my_tree_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf_optimised/PhyloSuite/FastTree_results/all_gene_trees.nwk"
+my_tree_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf_optimised/TrimAl_FastTree/All_consurf_sequences_downloaded_2024-06-12_14_msa_fasttree_noTrim.tree"
+#my_tree_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf_optimised/TrimAl_FastTree/All_consurf_sequences_downloaded_2024-06-12_14_msa_fasttree.tree"
+my_tree_f <- "C:/Users/nalpanic/Downloads/All_consurf_sequences_downloaded_2024-06-12_14_msa.tree"
 
 #my_gene_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf_optimised/All_consurf_sequences_header.txt"
-my_gene_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf_optimised/All_consurf_optimised_sequences_header.txt"
+my_gene_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/ConSurf_optimised/All_consurf_sequences_header_2024-06-12_14.txt"
 
 
 
@@ -48,8 +50,8 @@ my_gene <- data.table::fread(
 
 my_name <- sub("\\.txt", "_genename.txt", my_gene_f) %>%
     data.table::fread(
-        input = ., sep = "\t", header = T,
-        col.names = c("UniProtID", "GeneName"))
+        input = ., sep = "\t", header = T, select = c("From", "Gene Names")) %>%
+    set_colnames(c("UniProtID", "GeneName"))
 
 my_gene %<>%
     dplyr::left_join(x = ., y = my_name, by = "UniProtID") %>%
@@ -73,7 +75,7 @@ tocolour <- my_gene %>%
     dplyr::bind_cols(., Colour = my_big_cols[1:nrow(.)])
 
 colors <- my_gene %>%
-    dplyr::filter(., UniProtID %in% my_ids$UniProtID) %>%
+    dplyr::filter(., UniProtID %in% sub("UniRef90_", "", my_ids$UniProtID)) %>%
     dplyr::left_join(
         x = ., y = tocolour,
         by = "Type") %>%
@@ -97,7 +99,7 @@ my_taxid_format <- data.table::data.table(
     ID = as.integer(my_taxid[[1]]), Organism = names(my_taxid[[1]]))
 
 
-my_lineage <- unique(my_taxid_format$ID)[c(1:500)] %>%
+my_lineage <- unique(my_taxid_format$ID) %>%
     taxize::classification(sci_id = ., db = "ncbi")
 
 my_lineage_format <- my_lineage %>%
