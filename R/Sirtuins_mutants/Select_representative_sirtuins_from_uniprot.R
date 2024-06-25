@@ -1,12 +1,16 @@
 
 
 
+rm(list = ls())
+
 library(magrittr)
 library(ggplot2)
 
-my_annot_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/UniProt/uniref_SIRT1_OR_SIRT2_OR_SIRT3_OR_SI_2024_06_19.tsv"
+my_annot_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/UniProt/uniref_SIRTs_Sir2_CobB_SirTM_2024_06_25.tsv"
 
-my_fasta_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/UniProt/uniref_SIRT1_OR_SIRT2_OR_SIRT3_OR_SI_2024_06_19.fasta"
+my_fasta_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/UniProt/uniref_SIRTs_Sir2_CobB_SirTM_2024_06_25.fasta"
+
+my_interpro_f <- "D:/UniProt_Sirtuin_Interpro/uniref_SIRTs_Sir2_CobB_SirTM_2024_06_25_simplified.txt"
 
 my_annot <- data.table::fread(input = my_annot_f, sep = "\t", header = T) %>%
     dplyr::mutate(
@@ -47,6 +51,31 @@ my_annot <- data.table::fread(input = my_annot_f, sep = "\t", header = T) %>%
             sub("-$", "", .) %>%
             toupper(.))
 
+my_lineage <- unique(my_annot$`Common taxon ID`) %>%
+    split(., ceiling(seq_along(.)/100)) %>%
+    lapply(., function(x) {
+        tryCatch(
+            taxize::classification(sci_id = x, db = "ncbi"),
+            error = function(err) NA)
+    })
+
+my_lineage_df <- my_lineage %>%
+    unlist(., recursive = FALSE) %>%
+    plyr::ldply(., data.table::data.table, .id = "Common taxon ID") %>%
+    dplyr::mutate(., `Common taxon ID` = sub(".+\\.", "", `Common taxon ID`)) %>%
+    dplyr::select(., `Common taxon ID`, name, rank, id)
+
+if (any(is.na(my_lineage_df$name))) {
+    my_lineage_df <- unique(my_lineage_df[is.na(my_lineage_df$name),][["Common taxon ID"]]) %>%
+        taxize::classification(sci_id = ., db = "ncbi") %>%
+        plyr::ldply(., data.table::data.table, .id = "Common taxon ID") %>%
+        dplyr::bind_rows(my_lineage_df[!is.na(my_lineage_df$name),], .)
+}
+
+my_lineage_df %<>%
+    unique(.) %>%
+    dplyr::mutate(., id = as.integer(id))
+
 my_annot_count <- my_annot %>%
     dplyr::group_by(., `Name`) %>%
     dplyr::summarise(., Count = dplyr::n()) %>%
@@ -63,35 +92,88 @@ my_annot_label <- data.table::fread(
     sep = "\t", header = T) %>%
     dplyr::select(., Name, Label) %>%
     unique(.) %>%
+    dplyr::mutate(., Type = dplyr::case_when(
+        grepl("ADP-RIBOS", Label) ~ "SirTM",
+        grepl("COBB", Label) ~ "CobB",
+        grepl("SIR2", Label) ~ "Sir2",
+        grepl("SIRT1", Label) ~ "SIRT1",
+        grepl("SIRT2", Label) ~ "SIRT2",
+        grepl("SIRT3", Label) ~ "SIRT3",
+        grepl("SIRT4", Label) ~ "SIRT4",
+        grepl("SIRT5", Label) ~ "SIRT5",
+        grepl("SIRT6", Label) ~ "SIRT6",
+        grepl("SIRT7", Label) ~ "SIRT7",
+        TRUE ~ NA_character_
+    )) %>%
     dplyr::left_join(x = my_annot %>% dplyr::mutate(., ID = 1:dplyr::n()), y = ., by = "Name")
+
+ggplot(my_annot_label, aes(x = Label)) +
+    geom_bar() +
+    ggpubr::theme_pubr() +
+    coord_flip()
 
 ggplot(my_annot_label, aes(x = Label, y = Length)) +
     geom_boxplot() +
     ggpubr::theme_pubr() +
     coord_flip()
 
-my_annot_filt <- my_annot_label_count %>%
-    dplyr::filter(., !is.na(`Label`) & `Label` != "") %>%
-    dplyr::group_by(., `Label`, `Common taxon ID`, `Common taxon`) %>%
+ggplot(my_annot_label, aes(x = Type)) +
+    geom_bar() +
+    ggpubr::theme_pubr() +
+    coord_flip()
+
+ggplot(my_annot_label, aes(x = Type, y = Length)) +
+    geom_boxplot() +
+    ggpubr::theme_pubr() +
+    coord_flip()
+
+my_annot_filt <- my_annot_label %>%
+    dplyr::filter(., !is.na(`Type`) & `Type` != "") %>%
+    dplyr::group_by(., `Type`, `Common taxon ID`, `Common taxon`) %>%
     dplyr::filter(., Length == max(Length, na.rm = T)) %>%
     dplyr::ungroup(.)
 
 my_annot_filt_count <- my_annot_filt %>%
-    dplyr::group_by(., `Label`) %>%
+    dplyr::group_by(., `Type`) %>%
     dplyr::summarise(., Count = dplyr::n()) %>%
     dplyr::ungroup(.)
 
-my_annot_filt_split <- split(my_annot_filt, my_annot_filt$Label)
+my_annot_filt_taxon <- my_annot_filt %>%
+    dplyr::group_by(., `Common taxon ID`, `Common taxon`) %>%
+    dplyr::summarise(
+        ., Type_count = dplyr::n_distinct(Type),
+        Type = paste(sort(unique(Type)), collapse = ";"),
+        Gene_count = dplyr::n()) %>%
+    dplyr::ungroup(.)
 
-my_annot_filt_select <- lapply(names(my_annot_filt_split), function(x) {
-    my_samp <- floor(my_annot_filt_count[my_annot_filt_count$Label == x, ][["Count"]]*0.15) %>%
-        ifelse(. < 1, 1, .)
-    my_annot_filt_split[[x]][sample(x = nrow(my_annot_filt_split[[x]]), size = my_samp, replace = FALSE), ]
-}) %>%
-    plyr::ldply(., dplyr::bind_rows, .id = "Label")
+my_annot_filt_taxon2 <- my_annot_filt_taxon %>%
+    dplyr::filter(., grepl(" ", `Common taxon`)) %>%
+    dplyr::filter(., Type_count == Gene_count) %>%
+    dplyr::filter(., grepl("^[A-Z]", `Common taxon`)) %>%
+    dplyr::mutate(., Genus = sub(" .+", "", `Common taxon`))
 
-my_lineage <- unique(my_annot_filt_select$`Common taxon ID`) %>%
-    split(., ceiling(seq_along(.)/1)) %>%
+
+
+#my_annot_filt_split <- split(my_annot_filt, my_annot_filt$Type)
+
+#my_annot_filt_select <- lapply(names(my_annot_filt_split), function(x) {
+#    my_samp <- floor(my_annot_filt_count[my_annot_filt_count$Label == x, ][["Count"]]*0.15) %>%
+#        ifelse(. < 1, 1, .)
+#    my_annot_filt_split[[x]][sample(x = nrow(my_annot_filt_split[[x]]), size = my_samp, replace = FALSE), ]
+#}) %>%
+#    plyr::ldply(., dplyr::bind_rows, .id = "Label")
+#
+#my_lineage <- unique(my_annot_filt_select$`Common taxon ID`) %>%
+#    split(., ceiling(seq_along(.)/1)) %>%
+#    lapply(., function(x) {
+#        tryCatch(
+#            taxize::classification(sci_id = x, db = "ncbi"),
+#            error = function(err) NA)
+#    })
+
+
+my_lineage <- unique(my_annot_filt_taxon2$`Common taxon ID`) %>%
+    split(., ceiling(seq_along(.)/100)) %>%
     lapply(., function(x) {
         tryCatch(
             taxize::classification(sci_id = x, db = "ncbi"),
@@ -111,13 +193,23 @@ my_lineage_df <- unique(my_lineage_df[is.na(my_lineage_df$name),][["Common taxon
     unique(.) %>%
     dplyr::mutate(., id = as.integer(id))
 
-my_annot_filt_select_annot <- my_annot_filt_select %>%
+#my_annot_filt_select_annot <- my_annot_filt_select %>%
+#    dplyr::left_join(
+#        x = ., y = my_lineage_df %>% dplyr::select(., rank, id) %>% unique(.),
+#        by = c("Common taxon ID" = "id"))
+
+my_annot_filt_select_annot <- my_annot_filt_taxon2 %>%
     dplyr::left_join(
         x = ., y = my_lineage_df %>% dplyr::select(., rank, id) %>% unique(.),
         by = c("Common taxon ID" = "id"))
 
 my_annot_filt_select_annot_species <- my_annot_filt_select_annot %>%
     dplyr::filter(., rank %in% c("species"))
+
+my_interpro <- data.table::fread(
+    input = my_interpro_f, sep = "\t", header = T)
+
+table(my_interpro$`InterPro description`) %>% View(.)
 
 my_fasta <- seqinr::read.fasta(
     file = my_fasta_f, seqtype = "AA", as.string = T)
