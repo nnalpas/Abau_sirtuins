@@ -6,6 +6,8 @@ rm(list = ls())
 library(magrittr)
 library(ggplot2)
 
+my_plot <- list()
+
 my_annot_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/UniProt/uniref_SIRTs_Sir2_CobB_SirTM_2024_06_25.tsv"
 
 my_fasta_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/UniProt/uniref_SIRTs_Sir2_CobB_SirTM_2024_06_25.fasta"
@@ -92,12 +94,12 @@ my_interpro_gather <- my_interpro %>%
         TRUE ~ "Sirtuin family"
     ))
 
-ggplot(my_annot_interpro, aes(x = Type)) +
+my_plot[["count_total"]] <- ggplot(my_annot_interpro, aes(x = Type)) +
     geom_bar() +
     ggpubr::theme_pubr() +
     coord_flip()
 
-ggplot(my_annot_interpro, aes(x = Type, y = Length)) +
+my_plot[["length_total"]] <- ggplot(my_annot_interpro, aes(x = Type, y = Length)) +
     geom_boxplot() +
     ggpubr::theme_pubr() +
     coord_flip()
@@ -119,12 +121,12 @@ my_annot_interpro_tax_filt <- my_annot_interpro_tax %>%
     dplyr::filter(., is.na(Length) | Length < 900) %>%
     dplyr::filter(., Priority <= 1)
 
-ggplot(my_annot_interpro_tax_filt, aes(x = Type)) +
+my_plot[["count_selected"]] <- ggplot(my_annot_interpro_tax_filt, aes(x = Type)) +
     geom_bar() +
     ggpubr::theme_pubr() +
     coord_flip()
 
-ggplot(my_annot_interpro_tax_filt, aes(x = Type, y = Length)) +
+my_plot[["length_selected"]] <- ggplot(my_annot_interpro_tax_filt, aes(x = Type, y = Length)) +
     geom_boxplot() +
     ggpubr::theme_pubr() +
     coord_flip()
@@ -144,4 +146,7 @@ data.table::fwrite(
     x = my_annot_interpro_tax_filt, file = sub(".fasta", "_selected.txt", my_fasta_f),
     append = F, quote = F, sep = "\t", row.names = F, col.names = T)
 
+pdf(sub(".fasta", ".pdf", my_fasta_f), 10, 10)
+my_plot
+dev.off()
 
