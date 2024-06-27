@@ -12,7 +12,9 @@ my_annot_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brand
 
 my_fasta_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/UniProt/uniref_SIRTs_Sir2_CobB_SirTM_2024_06_25.fasta"
 
-my_interpro_f <- "D:/UniProt_Sirtuin_Interpro/uniref_SIRTs_Sir2_CobB_SirTM_2024_06_25_interpro_simplified.txt"
+my_interpro_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/UniProt/uniref_SIRTs_Sir2_CobB_SirTM_2024_06_25_interpro_simplified.txt"
+
+my_outlier_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/UniProt/Tree_2024-06-26/uniref_SIRTs_Sir2_CobB_SirTM_2024_06_25_selected_msa_fasttree.outliers"
 
 my_annot <- data.table::fread(input = my_annot_f, sep = "\t", header = T)
 
@@ -83,9 +85,17 @@ my_interpro_gather <- my_interpro %>%
     dplyr::group_by(., `Protein accession`) %>%
     dplyr::summarise(
         ., Domain = paste0(sort(unique(Domain)), collapse = ";")) %>%
-    dplyr::ungroup(.) %>%
+    dplyr::ungroup(.)
+
+my_annot_interpro <- my_annot %>%
+    dplyr::filter(., `Cluster ID` %in% my_sirtuin_ids) %>%
+    dplyr::left_join(
+    x = ., y = my_interpro_gather,
+    by = c("Cluster ID" = "Protein accession")) %>%
+    dplyr::filter(., !grepl(
+        "active regulator", `Cluster Name`, ignore.case = T)) %>%
     dplyr::mutate(., Type = dplyr::case_when(
-        grepl("NAD-dependent deacetylase, Class IV", Domain) ~ "Sirtuin, class IV",
+        grepl("NAD-dependent deacetylase, Class IV", Domain) | grepl("(SIRT|sirtuin-)(6|7)", `Cluster Name`) ~ "Sirtuin, class IV",
         grepl("Sirtuin, class III", Domain) ~ "Sirtuin, class III",
         grepl("Sirtuin, class II", Domain) ~ "Sirtuin, class II",
         grepl("Sirtuin, class I", Domain) ~ "Sirtuin, class I",
@@ -117,8 +127,11 @@ my_annot_interpro_tax <- my_lineage_df_wide %>%
     dplyr::ungroup(.) %>%
     dplyr::mutate(., Priority = ifelse(!grepl("Cluster", my_annot_interpro$`Cluster Name`), 0, Priority))
 
+my_outliers <- data.table::fread(input = my_outlier_f, sep = "\t", header = T)
+
 my_annot_interpro_tax_filt <- my_annot_interpro_tax %>%
-    dplyr::filter(., is.na(Length) | Length < 900) %>%
+    dplyr::filter(., !`Cluster ID` %in% my_outliers[my_outliers$Distance > 6.5, ][["UniProtID"]]) %>%
+    dplyr::filter(., is.na(Length) | (Length < 900 & Length > 200)) %>%
     dplyr::filter(., Priority <= 1)
 
 my_plot[["count_selected"]] <- ggplot(my_annot_interpro_tax_filt, aes(x = Type)) +
@@ -139,14 +152,14 @@ my_fasta_filt <- my_fasta[
 
 seqinr::write.fasta(
     sequences = my_fasta_filt, names = names(my_fasta_filt),
-    file.out = sub(".fasta", "_selected.fasta", my_fasta_f),
+    file.out = sub(".fasta", "_selected2.fasta", my_fasta_f),
     open = "w", nbchar = 60)
 
 data.table::fwrite(
-    x = my_annot_interpro_tax_filt, file = sub(".fasta", "_selected.txt", my_fasta_f),
+    x = my_annot_interpro_tax_filt, file = sub(".fasta", "_selected2.txt", my_fasta_f),
     append = F, quote = F, sep = "\t", row.names = F, col.names = T)
 
-pdf(sub(".fasta", ".pdf", my_fasta_f), 10, 10)
+pdf(sub(".fasta", "_2.pdf", my_fasta_f), 10, 10)
 my_plot
 dev.off()
 
