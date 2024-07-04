@@ -30,7 +30,7 @@ my_colo <- c(
 
 my_data_f <- c("C:/Users/nalpanic/SynologyDrive/Work/Abaumannii_trimeth/dbPTM/Robin_et_al._Sirtuins_mutants_Acetyl_formatted_per_sites.txt", "C:/Users/nalpanic/SynologyDrive/Work/Abaumannii_trimeth/dbPTM/Robin_et_al._Sirtuins_mutants_Succinyl_formatted_per_sites.txt")
 
-my_annot_f <- "C:/Users/nalpanic/SynologyDrive/Work/Abaumannii_trimeth/Annotation/2023-05-16/Acinetobacter_baumannii_ATCC_17978_full_annotation_2023-05-16_manual_review_withOperon.txt"
+my_annot_f <- "C:/Users/nalpanic/SynologyDrive/Work/Abaumannii_trimeth/Annotation/2023-05-16/Acinetobacter_baumannii_ATCC_17978_full_annotation_2024-03-12_manual_review_withOperon_withSir-targets.txt"
 
 my_domain_f <- "C:/Users/nalpanic/SynologyDrive/Work/Abaumannii_trimeth/InterPro/PTM_on_activesite_2024-01-10.txt"
 
@@ -152,12 +152,16 @@ my_targets <- my_annot_targets %>%
 toplot <- interesting_sites_long %>%
     dplyr::filter(., `Accessions ABYAL` %in% my_targets)
 
-toplot_panel <- split(x = unique(toplot$Name), ceiling(seq_along(unique(toplot$Name))/16)) %>%
+toplot_panel <- split(
+    x = unique(toplot$Name), ceiling(seq_along(unique(toplot$Name))/17)) %>%
     plyr::ldply(., data.table::data.table, .id = "Panel") %>%
     set_colnames(c("Panel", "Name"))
 
 toplot %<>%
     dplyr::left_join(x = ., y = toplot_panel, by = "Name")
+
+toplot %<>%
+    dplyr::filter(., !grepl("A1S_2724", Site))
 
 my_plot[["heatmap_biofilm"]] <- ggplot(
     toplot,
@@ -196,7 +200,7 @@ my_plot[["heatmap_actsite"]] <- ggplot(
     scale_fill_manual(values = my_colo, na.value = "#F2F2F2") +
     facet_wrap(facets = vars(Panel), ncol = 4, scales = "free_y")
 
-pdf("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sites_of_interest/Site_heatmap_2024-03-12.pdf", width = 10, height = 9)
+pdf("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sites_of_interest/Site_heatmap_2024-07-04.pdf", width = 10, height = 10)
 my_plot
 dev.off()
 
