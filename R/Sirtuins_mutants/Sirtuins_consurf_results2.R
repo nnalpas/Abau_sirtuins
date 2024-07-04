@@ -258,6 +258,32 @@ for (x in unique(my_phylum_stats[[cluster_col]])) {
 
 dev.off()
 
+tax_col <- "genus"
+
+cluster_col <- "Cluster"
+
+my_sirt_stats <- my_gene_clust %>%
+    dplyr::filter(., !is.na(!!as.name(tax_col)) & !!as.name(tax_col) != "") %>%
+    dplyr::group_by(., !!as.name(cluster_col), !!as.name(tax_col)) %>%
+    dplyr::summarise(
+        ., UniProtID = paste0(UniProtID, collapse = ";"),
+        species = paste0(species, collapse = ";"),
+        superkingdom = unique(superkingdom),
+        phylum = unique(phylum),
+        Count = dplyr::n()) %>%
+    dplyr::mutate(., `Cluster (count)` = paste0(Cluster, " (", Count, ")")) %>%
+    dplyr::group_by(., !!as.name(tax_col)) %>%
+    dplyr::summarise(
+        ., UniProtID = paste0(UniProtID, collapse = ";"),
+        species = paste0(species, collapse = ";"),
+        superkingdom = unique(superkingdom),
+        phylum = unique(phylum),
+        `Total cluster` = dplyr::n_distinct(Cluster),
+        `Total sirtuins` = sum(Count),
+        `Cluster (count)` = paste0(sort(`Cluster (count)`), collapse = ";")) %>%
+    dplyr::ungroup(.)
+
+
 #priority_species <- c(
 #    "Acinetobacter baumannii", "Enterobacterales", "Salmonella Typhi",
 #    "Shigella spp.", "Mycobacterium tuberculosis", "Enterococcus faecium",
@@ -287,6 +313,11 @@ my_domain_cluster <- my_domain_stats %>%
     dplyr::group_by(., Domain) %>%
     dplyr::summarise_all(~paste0(., collapse = ";")) %>%
     dplyr::ungroup(.)
+
+data.table::fwrite(
+    x = my_sirt_stats,
+    file = sub("\\.(nwk|tree)", "_sirt_stats.txt", my_tree_f),
+    append = F, quote = F, sep = "\t", row.names = F, col.names = T)
 
 data.table::fwrite(
     x = my_domain_stats,
