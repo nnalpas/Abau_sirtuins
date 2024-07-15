@@ -62,7 +62,7 @@ my_data$Condition <- factor(
     x = my_data$Condition, levels = names(my_colo), ordered = TRUE)
 
 my_annot <- data.table::fread(
-    input = my_annot_f, sep = "\t", quote = "", header = T)
+    input = my_annot_f, sep = "\t", header = T)
 
 my_annot_targets <- my_annot
 for (w in c("biofilm", "motility", "adhesion", "virulence")) {
@@ -92,7 +92,8 @@ interesting_sites$In_actsite <- !is.na(interesting_sites$`locs.description`) & i
 
 interesting_sites <- my_annot_targets %>%
     dplyr::select(
-        ., `Locus Tag`, `Gene Name`, `GenBank_gene_accession`,
+        ., `Locus Tag`, `Gene Name`,
+        `Gene Name [combined]`, `GenBank_gene_accession`,
         tidyselect::starts_with("In_")) %>%
     dplyr::left_join(
         x = interesting_sites,
@@ -104,6 +105,7 @@ interesting_sites %<>%
     dplyr::mutate(
         ., Name = dplyr::case_when(
             !is.na(`Gene Name`) & `Gene Name` != "" ~ stringr::str_to_title(`Gene Name`),
+            !is.na(`Gene Name [combined]`) & `Gene Name [combined]` != "" ~ stringr::str_to_title(sub(";.*", "", `Gene Name [combined]`)),
             !is.na(`GenBank_gene_accession`) & `GenBank_gene_accession` != "" ~ `GenBank_gene_accession`,
             TRUE ~ `Accessions ABYAL`),
         Modified = paste0(AA, Position)) %>%
@@ -200,7 +202,7 @@ my_plot[["heatmap_actsite"]] <- ggplot(
     scale_fill_manual(values = my_colo, na.value = "#F2F2F2") +
     facet_wrap(facets = vars(Panel), ncol = 4, scales = "free_y")
 
-pdf("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sites_of_interest/Site_heatmap_2024-07-04.pdf", width = 10, height = 10)
+pdf("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sites_of_interest/Site_heatmap_2024-07-15.pdf", width = 10, height = 10)
 my_plot
 dev.off()
 
