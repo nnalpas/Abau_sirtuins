@@ -80,12 +80,11 @@ my_annot <- data.table::fread(
 my_annot %<>%
     dplyr::select(
         ., `Locus Tag`, `GenBank_accession`, `GenBank_gene_accession`,
-        `Gene Name`, `Product Name`,
+        `Gene Name [combined]`, `Product Name`,
         `KEGG Pathway Name`, `GOBP Term`,
         `GOCC Term`, `GOMF Term`, COG_function,
         `Subcellular Localization [b2g]`, COG_function_review,
-        OperonID, essentiality, `Known sirtuin target`,
-        `Gene Names [ukb]`, `RefSeq ID`) %>%
+        OperonID, essentiality, `Known sirtuin target`, `RefSeq ID`) %>%
     dplyr::left_join(
         x = my_k_count,
         y = ., by = c("Accessions ABYAL" = "Locus Tag"))
@@ -202,7 +201,7 @@ for (x in unique(my_data$PTM)) {
         dplyr::left_join(x = ., y = my_domain_sum) %>%
         dplyr::left_join(x = ., y = my_actsite_sum) %>%
         dplyr::left_join(x = ., y = my_annot[, c(
-            "Accessions ABYAL", "Gene Name", "Gene Names [ukb]",
+            "Accessions ABYAL", "Gene Name [combined]",
             "GenBank_accession", "GenBank_gene_accession", "RefSeq ID")])
     
     my_data_wide <- my_data %>%
@@ -219,22 +218,22 @@ for (x in unique(my_data$PTM)) {
     
     data.table::fwrite(
         x = my_data_wide,
-        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_explain_2024-03-13.txt"),
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_explain_2024-07-15.txt"),
         append = F, quote = F, sep = "\t", row.names = F, col.names = T)
     
     data.table::fwrite(
         x = my_sites_explained_final,
-        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_sites_explain_2024-03-13.txt"),
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_sites_explain_2024-07-15.txt"),
         append = F, quote = F, sep = "\t", row.names = F, col.names = T)
     
     data.table::fwrite(
         x = my_sites_explained,
-        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_windows_for_OA_2024-03-13.txt"),
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_windows_for_OA_2024-07-15.txt"),
         append = F, quote = F, sep = "\t", row.names = F, col.names = T)
     
     data.table::fwrite(
         x = my_prot_explained,
-        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_proteins_for_OA_2024-03-13.txt"),
+        file = paste0("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/", x, "_proteins_for_OA_2024-07-15.txt"),
         append = F, quote = F, sep = "\t", row.names = F, col.names = T)
     
 }
@@ -251,9 +250,25 @@ my_data_wide <- my_data %>%
         data = ., names_from = Condition, values_from = Modification) %>%
     dplyr::left_join(x = ., y = my_annot)
 
+my_domain_sum_gather <- my_domain_sum %>%
+    dplyr::mutate(., `Functional domain` = paste(Position, " [", `Functional domain`, "]", sep = "")) %>%
+    dplyr::group_by(., `Accessions ABYAL`) %>%
+    dplyr::summarise(., `Functional domain` = paste0(`Functional domain`, collapse = ";")) %>%
+    dplyr::ungroup(.)
+
+my_actsite_sum_gather <- my_actsite_sum %>%
+    dplyr::mutate(., `Active sites` = paste(Position, " [", `Active sites`, "]", sep = "")) %>%
+    dplyr::group_by(., `Accessions ABYAL`) %>%
+    dplyr::summarise(., `Active sites` = paste0(`Active sites`, collapse = ";")) %>%
+    dplyr::ungroup(.)
+
+my_data_wide %<>%
+    dplyr::left_join(x = ., y = my_domain_sum_gather) %>%
+    dplyr::left_join(x = ., y = my_actsite_sum_gather)
+
 data.table::fwrite(
     x = my_data_wide,
-    file = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/Acetylation_Succinylation_sirtuins_mutants_2024-03-13.txt",
+    file = "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Condition_explanation/Acetylation_Succinylation_sirtuins_mutants_2024-07-15.txt",
     append = F, quote = F, sep = "\t", row.names = F, col.names = T)
 
 
