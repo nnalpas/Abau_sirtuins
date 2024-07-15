@@ -62,7 +62,8 @@ my_data$Condition <- factor(
     x = my_data$Condition, levels = names(my_colo), ordered = TRUE)
 
 my_annot <- data.table::fread(
-    input = my_annot_f, sep = "\t", header = T)
+    input = my_annot_f, sep = "\t", header = T) %>%
+    dplyr::mutate(., `Gene Name` = sub(";.*", "", `Gene Name [combined]`))
 
 my_annot_targets <- my_annot
 for (w in c("biofilm", "motility", "adhesion", "virulence")) {
@@ -105,8 +106,9 @@ interesting_sites %<>%
             !is.na(`Gene Name`) & `Gene Name` != "" ~ stringr::str_to_title(`Gene Name`),
             !is.na(`GenBank_gene_accession`) & `GenBank_gene_accession` != "" ~ `GenBank_gene_accession`,
             TRUE ~ `Accessions ABYAL`),
+        Identifier = ifelse(!is.na(`GenBank_gene_accession`) & `GenBank_gene_accession` != "", `GenBank_gene_accession`, `Accessions ABYAL`),
         Modified = paste0(AA, Position)) %>%
-    tidyr::unite(data = ., col = "Site", Name, `Accessions ABYAL`, Modified, sep = "_", remove = F) %>%
+    tidyr::unite(data = ., col = "Site", Name, Identifier, Modified, sep = "_", remove = F) %>%
     tidyr::unite(data = ., col = "In_condition", PTM, Condition, sep = "_")
 
 # This overrides the previous keyword detection
@@ -126,7 +128,7 @@ interesting_sites_long <- interesting_sites %>%
     dplyr::mutate(
         ., Type = ifelse(value == TRUE, Type, NA)) %>%
 #    dplyr::filter(., value == TRUE) %>%
-    dplyr::arrange(., Name, `Accessions ABYAL`, Position)
+    dplyr::arrange(., Name, Identifier, Position)
 
 interesting_sites_long$Site <- factor(
     x = interesting_sites_long$Site,
@@ -147,7 +149,7 @@ interesting_sites_long$Type <- factor(
     ordered = TRUE)
 
 my_targets <- my_annot_targets %>%
-    dplyr::filter(., grepl("fad|Fad|Ato|ato|aceA", `Gene Name`)) %>%
+    dplyr::filter(., grepl("fad|Fad|Ato|ato|aceA|fab|clbC|clbG", `Gene Name`)) %>%
     .[["Locus Tag"]] %>%
     unique(.)
 #my_targets <- my_annot_targets %>%
@@ -158,7 +160,7 @@ my_targets <- my_annot_targets %>%
 toplot <- interesting_sites_long %>%
     dplyr::filter(., `Accessions ABYAL` %in% my_targets)
 
-toplot_panel <- split(x = unique(toplot$`Accessions ABYAL`), ceiling(seq_along(unique(toplot$`Accessions ABYAL`))/6)) %>%
+toplot_panel <- split(x = unique(toplot$`Accessions ABYAL`), ceiling(seq_along(unique(toplot$`Accessions ABYAL`))/9)) %>%
     plyr::ldply(., data.table::data.table, .id = "Panel") %>%
     set_colnames(c("Panel", "Accessions ABYAL"))
 
@@ -176,7 +178,7 @@ my_plot[["heatmap_biofilm"]] <- ggplot(
     scale_fill_manual(values = my_colo, na.value = "#F2F2F2") +
     facet_wrap(facets = vars(Panel), ncol = 3, scales = "free_y")
 
-pdf("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sites_of_interest/Site_heatmap_2024-04-16.pdf", width = 10, height = 9)
+pdf("C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sites_of_interest/Site_heatmap_2024-07-12.pdf", width = 10, height = 9)
 my_plot
 dev.off()
 
