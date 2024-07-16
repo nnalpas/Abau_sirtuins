@@ -7,9 +7,13 @@ library(magrittr)
 library(ggplot2)
 
 length_prot <- 473
-length_prot <- 232
+#length_prot <- 232
 
-my_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/pubMLST_Blast/cobB_presence_table.txt"
+perc_identity <- 75
+perc_coverage <- 75
+evalue <- 0.1
+
+my_f <- "C:/Users/nalpanic/SynologyDrive/Work/Colleagues shared work/Brandon_Robin/Abaumannii_mutants/Analysis/Sirtuin_conservation/pubMLST_Blast/A1S_1281_presence_table.txt"
 
 my_data <- data.table::fread(
     input = my_f, sep = "\t", quote = "", header = T, fill = T) %>%
@@ -75,7 +79,7 @@ ggplot(my_data, aes(x = `Bit score`)) +
     ylab("Number of isolates")
 
 ggplot(
-    my_data %>% dplyr::filter(., `% identity` > 90 & `Alignment length`/length_prot > 0.90 & `E-value` < 0.1),
+    my_data %>% dplyr::filter(., `% identity` > perc_identity & `Alignment length`/length_prot*100 > perc_coverage & `E-value` < evalue),
     aes(x = factor(x = `ST (MLST (Pasteur))`, levels = sort(unique(`ST (MLST (Pasteur))`)), ordered = T))) +
     geom_bar(stat = "count", position = "dodge", fill = "darkgrey", colour = "black") +
     ggpubr::theme_pubr() +
@@ -84,13 +88,25 @@ ggplot(
         vjust = -0.5) +
     xlab("MLST (Pasteur)") +
     ylab("Number of isolates") +
-    ggtitle("Isolates with > 90% identity over 90% sequence and E-value < 0.1")
+    ggtitle(paste("Isolates with > ", perc_identity, "% identity over ", perc_coverage, "% sequence and E-value < ", evalue, sep = ""))
+
+ggplot(
+    my_data %>% dplyr::filter(., `% identity` < perc_identity | `Alignment length`/length_prot*100 < perc_coverage | `E-value` > evalue),
+    aes(x = factor(x = `ST (MLST (Pasteur))`, levels = sort(unique(`ST (MLST (Pasteur))`)), ordered = T))) +
+    geom_bar(stat = "count", position = "dodge", fill = "darkgrey", colour = "black") +
+    ggpubr::theme_pubr() +
+    stat_count(
+        aes(y = ..count.., label = ..count..), geom = "text",
+        vjust = -0.5) +
+    xlab("MLST (Pasteur)") +
+    ylab("Number of isolates") +
+    ggtitle(paste("Isolates with < ", perc_identity, "% identity under ", perc_coverage, "% sequence or E-value > ", evalue, sep = ""))
 
 toplot <- my_data %>%
     dplyr::group_by(., `ST (MLST (Pasteur))`) %>%
     dplyr::summarise(
         ., Total = dplyr::n_distinct(`Isolate id`),
-        Conserved = sum(`% identity` > 90 & `Alignment length`/length_prot > 0.90 & `E-value` < 0.1),
+        Conserved = sum(`% identity` > perc_identity & `Alignment length`/length_prot*100 > perc_coverage & `E-value` < evalue),
         Percentage = Conserved / Total * 100) %>%
     dplyr::ungroup(.) %>%
     dplyr::arrange(., dplyr::desc(Conserved))
@@ -103,7 +119,26 @@ ggplot(
     ggpubr::theme_pubr() +
     xlab("MLST (Pasteur)") +
     ylab("Number of isolates") +
-    ggtitle("Isolates with > 90% identity over 90% sequence and E-value < 0.1")
+    ggtitle(paste("Isolates with > ", perc_identity, "% identity over ", perc_coverage, "% sequence and E-value < ", evalue, sep = ""))
+
+toplot <- my_data %>%
+    dplyr::group_by(., `ST (MLST (Pasteur))`) %>%
+    dplyr::summarise(
+        ., Total = dplyr::n_distinct(`Isolate id`),
+        Conserved = sum(`% identity` < perc_identity | `Alignment length`/length_prot*100 < perc_coverage | `E-value` > evalue),
+        Percentage = Conserved / Total * 100) %>%
+    dplyr::ungroup(.) %>%
+    dplyr::arrange(., dplyr::desc(Conserved))
+
+ggplot(
+    toplot %>% dplyr::filter(., `Percentage` > 0),
+    aes(x = factor(x = `ST (MLST (Pasteur))`, levels = sort(unique(`ST (MLST (Pasteur))`)), ordered = T), y = Conserved, label = paste(round(Percentage, digit = 2), "%"))) +
+    geom_bar(stat = "identity", position = "dodge", fill = "darkgrey", colour = "black") +
+    geom_text(stat = "identity", position = position_dodge(width = 0.9), vjust = -0.3) +
+    ggpubr::theme_pubr() +
+    xlab("MLST (Pasteur)") +
+    ylab("Number of isolates") +
+    ggtitle(paste("Isolates with < ", perc_identity, "% identity under ", perc_coverage, "% sequence or E-value > ", evalue, sep = ""))
 
 dev.off()
 
