@@ -20,8 +20,16 @@ my_dist <- seqinr::dist.alignment(x = my_aln, "identity", gap = FALSE)
 
 my_dist_df <- as.matrix(my_dist) %>%
     as.data.frame(.) %>%
-    tibble::rownames_to_column(.data = ., var = "ID") %>%
-    data.table::data.table(.)
+    tibble::rownames_to_column(.data = ., var = "ID_A") %>%
+    data.table::data.table(.) %>%
+    tidyr::pivot_longer(
+        data = ., cols = -ID_A, names_to = "ID_B", values_to = "Identity")
+
+data.table::fwrite(
+    x = my_dist_df, file = sub("\\.faa", "_distance.txt", my_aln_f),
+    append = F, quote = F, sep = "\t", row.names = F, col.names = T)
+
+
 
 #my_dist_target <- my_dist_df %>%
 #    dplyr::filter(., ID == "Input_seq") %>%
